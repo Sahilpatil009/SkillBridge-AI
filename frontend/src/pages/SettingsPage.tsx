@@ -36,8 +36,8 @@ export default function SettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false)
 
   useEffect(() => {
-    api.get<StudentProfile>('/api/v1/profile')
-      .then((res) => setProfile(res.data))
+    api.get<{ profile?: StudentProfile } & StudentProfile>('/api/v1/profile')
+      .then((res) => setProfile(res.data.profile ?? res.data))
       .catch(() => setProfile({}))
       .finally(() => setProfileLoading(false))
   }, [])
