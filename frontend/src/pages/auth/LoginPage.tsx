@@ -2,7 +2,7 @@ import { useState, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Lock } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import api from '../../lib/api'
+import api, { getApiErrorMessage } from '../../lib/api'
 import ErrorAlert from '../../components/ui/ErrorAlert'
 import { AuthResponse } from '../../types'
 
@@ -24,8 +24,7 @@ export default function LoginPage() {
       login(res.data.access_token, res.data.user)
       navigate('/app/dashboard', { replace: true })
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
-      setError(e?.response?.data?.detail ?? 'Login failed. Please verify your credentials.')
+      setError(getApiErrorMessage(err, 'Login failed. Please verify your credentials.'))
     } finally {
       setLoading(false)
     }

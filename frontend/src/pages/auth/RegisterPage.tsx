@@ -2,7 +2,7 @@ import { useState, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, UserPlus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import api from '../../lib/api'
+import api, { getApiErrorMessage } from '../../lib/api'
 import ErrorAlert from '../../components/ui/ErrorAlert'
 import { AuthResponse } from '../../types'
 
@@ -43,8 +43,7 @@ export default function RegisterPage() {
       login(res.data.access_token, res.data.user)
       navigate('/app/onboarding', { replace: true })
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
-      setError(e?.response?.data?.detail ?? 'Registration failed. Please try again.')
+      setError(getApiErrorMessage(err, 'Registration failed. Please try again.'))
     } finally {
       setLoading(false)
     }
