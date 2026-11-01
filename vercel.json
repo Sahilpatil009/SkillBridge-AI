@@ -3,7 +3,10 @@
   "services": {
     "frontend": {
       "root": "frontend/",
-      "framework": "vite"
+      "framework": "vite",
+      "rewrites": [
+        { "source": "/(.*)", "destination": "/index.html" }
+      ]
     },
     "backend": {
       "root": "backend/",
@@ -16,6 +19,9 @@
       }
     }
   },
+  "redirects": [
+    { "source": "/loggin", "destination": "/login", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/docs", "destination": { "service": "backend" } },
     { "source": "/docs/(.*)", "destination": { "service": "backend" } },
