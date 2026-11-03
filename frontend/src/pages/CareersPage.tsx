@@ -44,7 +44,7 @@ export default function CareersPage() {
       await api.post('/api/v1/skill-gap/recalculate')
       setTargetCareerId(careerId)
     } catch {
-      // silent
+      setError('Failed to set target career.')
     } finally {
       setSettingTarget(null)
     }

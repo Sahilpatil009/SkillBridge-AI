@@ -54,6 +54,47 @@ def get_recent_question_ids(db: Session, user_id: int, skill_id: int) -> list:
     return list(set(ids))
 
 
+def serialize_questions(questions: list) -> list[dict]:
+    serialized = []
+    for q in questions:
+        options = [{"id": o.id, "text": o.text, "order_index": o.order_index} for o in q.options]
+        random.shuffle(options)
+        serialized.append(
+            {
+                "id": q.id,
+                "text": q.text,
+                "difficulty": q.difficulty,
+                "skill_id": q.skill_id,
+                "topic_id": q.topic_id,
+                "options": options,
+            }
+        )
+    return serialized
+
+
+def get_assessment_session(db: Session, user: User, assessment_id: int) -> dict:
+    assessment = (
+        db.query(Assessment)
+        .options(joinedload(Assessment.skill))
+        .filter(Assessment.id == assessment_id, Assessment.user_id == user.id)
+        .first()
+    )
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    if assessment.status == "submitted":
+        raise HTTPException(status_code=400, detail="Assessment already submitted")
+    questions = get_questions_for_skill(db, assessment.skill_id)
+    if not questions:
+        raise HTTPException(status_code=400, detail="No questions available for this skill yet")
+    return {
+        "assessment_id": assessment.id,
+        "skill_id": assessment.skill_id,
+        "skill_name": assessment.skill.name if assessment.skill else "",
+        "status": assessment.status,
+        "questions": questions,
+    }
+
+
 def create_assessment(db: Session, user: User, data: AssessmentCreate) -> dict:
     skill = db.query(Skill).filter(Skill.id == data.skill_id, Skill.is_active == True).first()
     if not skill:

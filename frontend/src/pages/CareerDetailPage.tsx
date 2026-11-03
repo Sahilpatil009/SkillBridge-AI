@@ -64,7 +64,7 @@ export default function CareerDetailPage() {
       await api.post('/api/v1/skill-gap/recalculate')
       setTargetCareerId(career.id)
     } catch {
-      // silent
+      setError('Failed to set target career.')
     } finally {
       setSettingTarget(false)
     }
@@ -73,10 +73,12 @@ export default function CareerDetailPage() {
   const responsibilities: string[] = career?.responsibilities
     ? (() => {
         try {
-          return JSON.parse(career.responsibilities)
+          const parsed = JSON.parse(career.responsibilities)
+          if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean)
         } catch {
-          return []
+          /* stored as a semicolon-separated paragraph from seed */
         }
+        return career.responsibilities.split(/;|\n/).map((item) => item.trim()).filter(Boolean)
       })()
     : []
 
@@ -183,7 +185,7 @@ export default function CareerDetailPage() {
                     </td>
                     <td className="py-3">
                       <span className={impBadge[req.importance] || 'badge-gray'}>
-                        {req.importance.replace('_', ' ')}
+                        {req.importance.replace(/_/g, ' ')}
                       </span>
                     </td>
                   </tr>

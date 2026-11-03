@@ -27,17 +27,23 @@ def _cors_origins() -> list[str]:
 def _init_schema_and_seed() -> None:
     from app.db.base import Base, SessionLocal, engine
     import app.models  # noqa: F401
-    from app.models.career import Career
+    from app.models.career import Career, CareerSkillRequirement
+    from app.models.assessment import Question
 
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        if db.query(Career).first() is None:
+        needs_catalog = db.query(Career).first() is None
+        needs_requirements = db.query(CareerSkillRequirement).first() is None
+        needs_questions = db.query(Question).first() is None
+        if needs_catalog or needs_requirements:
             from app.db.seed import seed
+
+            seed()
+        if needs_questions:
             from app.db.seed_questions import seed as seed_questions
             from app.db.seed_questions_extended import seed as seed_questions_extended
 
-            seed()
             seed_questions()
             seed_questions_extended()
     finally:
@@ -46,7 +52,7 @@ def _init_schema_and_seed() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if os.getenv("VERCEL"):
+    if os.getenv("VERCEL") or os.getenv("RENDER"):
         _init_schema_and_seed()
     yield
 

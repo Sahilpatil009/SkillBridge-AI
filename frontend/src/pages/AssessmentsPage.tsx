@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Play, History, ArrowRight, Search } from 'lucide-react'
-import api from '../lib/api'
+import api, { getApiErrorMessage } from '../lib/api'
+import { saveAssessmentSession } from '../lib/assessmentSession'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import ErrorAlert from '../components/ui/ErrorAlert'
 import EmptyState from '../components/ui/EmptyState'
@@ -9,7 +10,11 @@ import EmptyState from '../components/ui/EmptyState'
 interface Skill {
   id: number
   name: string
-  category: string
+  category: { id: number; name: string } | string
+}
+
+function skillCategoryName(skill: Skill): string {
+  return typeof skill.category === 'string' ? skill.category : skill.category?.name ?? 'Uncategorized'
 }
 
 interface AssessmentHistory {
@@ -57,29 +62,35 @@ export default function AssessmentsPage() {
     setError('')
     try {
       const res = await api.post('/api/v1/assessments', { skill_id: skillId })
+      const skillName = skills.find((s) => s.id === skillId)?.name || ''
+      saveAssessmentSession(res.data.assessment_id, {
+        questions: res.data.questions,
+        skill_id: res.data.skill_id,
+        skillName,
+      })
       navigate(`/app/assessments/${res.data.assessment_id}`, {
         state: {
           questions: res.data.questions,
           skill_id: res.data.skill_id,
-          skillName: skills.find((s) => s.id === skillId)?.name || '',
+          skillName,
         },
       })
-    } catch (e: any) {
-      setError(e.response?.data?.detail || 'Failed to start assessment.')
+    } catch (e: unknown) {
+      setError(getApiErrorMessage(e, 'Failed to start assessment.'))
     } finally {
       setStarting(null)
     }
   }
 
-  const filtered = skills.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.category.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = skills.filter((s) => {
+    const q = search.toLowerCase()
+    return s.name.toLowerCase().includes(q) || skillCategoryName(s).toLowerCase().includes(q)
+  })
 
   const grouped = filtered.reduce<Record<string, Skill[]>>((acc, s) => {
-    if (!acc[s.category]) acc[s.category] = []
-    acc[s.category].push(s)
+    const category = skillCategoryName(s)
+    if (!acc[category]) acc[category] = []
+    acc[category].push(s)
     return acc
   }, {})
 
@@ -159,10 +170,13 @@ export default function AssessmentsPage() {
                     <td className="py-3 text-right">
                       <button
                         className="btn-secondary text-[10px] py-1 px-3"
-                        onClick={() => navigate(`/app/assessments/${h.id}/result`)}
-                        disabled={h.status !== 'submitted'}
+                        onClick={() =>
+                          h.status === 'submitted'
+                            ? navigate(`/app/assessments/${h.id}/result`)
+                            : startAssessment(h.skill_id)
+                        }
                       >
-                        <span>VIEW REPORT</span>
+                        <span>{h.status === 'submitted' ? 'VIEW REPORT' : 'CONTINUE'}</span>
                         <ArrowRight className="w-3 h-3 ml-1" />
                       </button>
                     </td>

@@ -5,7 +5,14 @@ from app.db.base import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.schemas.assessment import AssessmentCreate, AssessmentSubmit, AssessmentResult
-from app.services.assessment_service import create_assessment, submit_assessment, get_assessment_history, get_assessment_result
+from app.services.assessment_service import (
+    create_assessment,
+    submit_assessment,
+    get_assessment_history,
+    get_assessment_result,
+    get_assessment_session,
+    serialize_questions,
+)
 
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 
@@ -17,17 +24,7 @@ def start_assessment(data: AssessmentCreate, current_user: User = Depends(get_cu
         "assessment_id": result["assessment_id"],
         "skill_id": result["skill_id"],
         "status": result["status"],
-        "questions": [
-            {
-                "id": q.id,
-                "text": q.text,
-                "difficulty": q.difficulty,
-                "skill_id": q.skill_id,
-                "topic_id": q.topic_id,
-                "options": [{"id": o.id, "text": o.text, "order_index": o.order_index} for o in q.options],
-            }
-            for q in result["questions"]
-        ],
+        "questions": serialize_questions(result["questions"]),
     }
 
 
@@ -52,6 +49,18 @@ def history(
         }
         for a in items
     ]
+
+
+@router.get("/{assessment_id}")
+def get_session(assessment_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    result = get_assessment_session(db, current_user, assessment_id)
+    return {
+        "assessment_id": result["assessment_id"],
+        "skill_id": result["skill_id"],
+        "skill_name": result["skill_name"],
+        "status": result["status"],
+        "questions": serialize_questions(result["questions"]),
+    }
 
 
 @router.post("/{assessment_id}/submit", response_model=AssessmentResult)

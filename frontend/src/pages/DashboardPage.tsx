@@ -105,7 +105,9 @@ export default function DashboardPage() {
       const summary: GapSummary | null = gapData?.summary ?? null
 
       const assessmentHistory = histRes.status === 'fulfilled' ? histRes.value.data || [] : []
-      const assessmentCount = assessmentHistory.length
+      const assessmentCount = Array.isArray(assessmentHistory)
+        ? assessmentHistory.filter((item: { status?: string }) => item.status === 'submitted').length
+        : 0
 
       const roadmapRaw = roadmapRes.status === 'fulfilled' ? roadmapRes.value.data : null
       const roadmapProgress =
@@ -121,16 +123,11 @@ export default function DashboardPage() {
         setSelectedCareerId(String(careersList[0].id))
       }
 
-      // Calculate readiness score
       let calculatedReadiness = 0
       if (summary && summary.total_required > 0) {
         calculatedReadiness = Math.round(
           ((summary.target_met * 1.0 + summary.needs_improvement * 0.5) / summary.total_required) * 100
         )
-      } else if (hasCareer && assessmentCount > 0) {
-        calculatedReadiness = Math.min(95, 45 + assessmentCount * 12)
-      } else if (hasCareer) {
-        calculatedReadiness = 35
       }
 
       setData({
@@ -157,7 +154,8 @@ export default function DashboardPage() {
       await api.post('/api/v1/skill-gap/recalculate')
       loadData()
     } catch {
-      // silent
+      setConnecting(false)
+      return
     } finally {
       setConnecting(false)
     }
@@ -167,16 +165,25 @@ export default function DashboardPage() {
     return <LoadingSpinner text="Benchmarking skill workspace..." />
   }
 
-  // Chart data matching screenshot 3 donut
   const chartData = [
-    { name: 'Critical Gap', value: data?.summary?.critical_gaps || 1, color: '#F472B6' },
-    { name: 'Needs Work', value: data?.summary?.needs_improvement || 2, color: '#FB923C' },
-    { name: 'Target Met', value: data?.summary?.target_met || 3, color: '#FBBF24' },
-    { name: 'Not Assessed', value: data?.summary?.not_assessed || 4, color: '#E4E4E7' },
+    { name: 'Critical Gap', value: data?.summary?.critical_gaps ?? 0, color: '#F472B6' },
+    { name: 'Needs Work', value: data?.summary?.needs_improvement ?? 0, color: '#FB923C' },
+    { name: 'Target Met', value: data?.summary?.target_met ?? 0, color: '#FBBF24' },
+    { name: 'Not Assessed', value: data?.summary?.not_assessed ?? 0, color: '#E4E4E7' },
   ]
 
-  const readinessScore = data?.readinessScore ?? 75
-  const isHighRisk = (data?.summary?.critical_gaps ?? 0) > 0 || readinessScore < 60
+  const readinessScore = data?.readinessScore ?? 0
+  const totalRequired = data?.summary?.total_required ?? 0
+  const notAssessed = data?.summary?.not_assessed ?? 0
+  const allUntested = totalRequired > 0 && notAssessed === totalRequired
+  const isHighRisk = (data?.summary?.critical_gaps ?? 0) > 0 || (readinessScore < 60 && !allUntested && totalRequired > 0)
+  const readinessBadge = !data?.hasTargetCareer
+    ? 'NOT CONNECTED'
+    : allUntested || totalRequired === 0
+      ? 'NOT TESTED'
+      : isHighRisk
+        ? 'CRITICAL GAP'
+        : 'STABLE MATCH'
 
   return (
     <div className="space-y-10 pb-16">
@@ -351,7 +358,7 @@ export default function DashboardPage() {
             <span>YOUR WORKSPACE</span>
           </div>
           <span className="font-mono text-xs font-bold text-neutral-500 uppercase tracking-wider">
-            1 CONNECTED
+            {data?.hasTargetCareer ? '1 CONNECTED' : '0 CONNECTED'}
           </span>
         </div>
 
@@ -360,10 +367,10 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="font-mono text-[11px] font-bold text-neutral-500 uppercase tracking-widest">
-                {firstName.toUpperCase()} / {data?.hasTargetCareer ? 'TARGET-ROLE' : 'DEFAULT'}
+                {firstName.toUpperCase()} / {data?.hasTargetCareer ? 'TARGET-ROLE' : 'NO-TARGET'}
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight font-sans mt-0.5">
-                {data?.targetCareer?.title || 'Full-Stack Developer'}
+                {data?.targetCareer?.title || 'Connect a career to calibrate this workspace'}
               </h2>
             </div>
 
@@ -390,8 +397,8 @@ export default function DashboardPage() {
             </div>
 
             {/* Pill Badge matching CRITICAL badge from screenshot */}
-            <span className={isHighRisk ? 'badge-red' : 'badge-green'}>
-              {isHighRisk ? 'CRITICAL GAP' : 'STABLE MATCH'}
+            <span className={isHighRisk ? 'badge-red' : allUntested || !data?.hasTargetCareer ? 'badge-gray' : 'badge-green'}>
+              {readinessBadge}
             </span>
           </div>
         </div>
@@ -414,8 +421,8 @@ export default function DashboardPage() {
                 <span className="text-4xl sm:text-5xl font-black text-neutral-900 font-sans tracking-tight">
                   {readinessScore}%
                 </span>
-                <span className={isHighRisk ? 'badge-red' : 'badge-green'}>
-                  {isHighRisk ? 'CRITICAL' : 'OPTIMAL'}
+                <span className={isHighRisk ? 'badge-red' : allUntested || !data?.hasTargetCareer ? 'badge-gray' : 'badge-green'}>
+                  {readinessBadge}
                 </span>
               </div>
 
@@ -483,7 +490,7 @@ export default function DashboardPage() {
                   {data?.summary?.needs_improvement ?? 0}
                 </div>
                 <div className="font-mono text-[10px] text-neutral-500 uppercase font-bold">
-                  HIGH
+                  NEEDS WORK
                 </div>
               </div>
               <div>
@@ -491,7 +498,7 @@ export default function DashboardPage() {
                   {data?.summary?.target_met ?? 0}
                 </div>
                 <div className="font-mono text-[10px] text-neutral-500 uppercase font-bold">
-                  MEDIUM
+                  ON TARGET
                 </div>
               </div>
               <div>
@@ -499,7 +506,7 @@ export default function DashboardPage() {
                   {data?.summary?.not_assessed ?? 0}
                 </div>
                 <div className="font-mono text-[10px] text-neutral-500 uppercase font-bold">
-                  LOW
+                  NOT TESTED
                 </div>
               </div>
             </div>

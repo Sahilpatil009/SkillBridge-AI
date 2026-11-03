@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { RefreshCw, Target, Play, ShieldCheck, ArrowRight, Compass } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
-import api from '../lib/api'
+import api, { getApiErrorMessage } from '../lib/api'
+import { saveAssessmentSession } from '../lib/assessmentSession'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import ErrorAlert from '../components/ui/ErrorAlert'
 import EmptyState from '../components/ui/EmptyState'
@@ -86,6 +87,11 @@ export default function SkillGapPage() {
     setError('')
     try {
       const res = await api.post('/api/v1/assessments', { skill_id: skillId })
+      saveAssessmentSession(res.data.assessment_id, {
+        questions: res.data.questions,
+        skill_id: res.data.skill_id,
+        skillName,
+      })
       navigate(`/app/assessments/${res.data.assessment_id}`, {
         state: {
           questions: res.data.questions,
@@ -94,8 +100,8 @@ export default function SkillGapPage() {
           returnTo: '/app/skill-gap',
         },
       })
-    } catch (e: any) {
-      setError(e.response?.data?.detail || 'Failed to start assessment.')
+    } catch (e: unknown) {
+      setError(getApiErrorMessage(e, 'Failed to start assessment.'))
     } finally {
       setStartingSkillId(null)
     }
@@ -250,8 +256,12 @@ export default function SkillGapPage() {
                   <span className="text-5xl font-black text-neutral-900 font-sans tracking-tight">
                     {completionRate}%
                   </span>
-                  <span className={report.summary.critical_gaps > 0 ? 'badge-red' : 'badge-green'}>
-                    {report.summary.critical_gaps > 0 ? 'CRITICAL GAP' : 'OPTIMAL'}
+                  <span className={report.summary.critical_gaps > 0 || completionRate < 60 ? 'badge-red' : 'badge-green'}>
+                    {report.summary.not_assessed === totalRequired
+                      ? 'NOT TESTED'
+                      : report.summary.critical_gaps > 0 || completionRate < 60
+                        ? 'CRITICAL GAP'
+                        : 'OPTIMAL'}
                   </span>
                 </div>
 
@@ -319,7 +329,7 @@ export default function SkillGapPage() {
                     {report.summary.needs_improvement}
                   </div>
                   <div className="font-mono text-[10px] text-neutral-500 uppercase font-bold">
-                    HIGH
+                    NEEDS WORK
                   </div>
                 </div>
                 <div>
@@ -327,7 +337,7 @@ export default function SkillGapPage() {
                     {report.summary.target_met}
                   </div>
                   <div className="font-mono text-[10px] text-neutral-500 uppercase font-bold">
-                    MEDIUM
+                    ON TARGET
                   </div>
                 </div>
                 <div>
@@ -335,7 +345,7 @@ export default function SkillGapPage() {
                     {report.summary.not_assessed}
                   </div>
                   <div className="font-mono text-[10px] text-neutral-500 uppercase font-bold">
-                    LOW
+                    NOT TESTED
                   </div>
                 </div>
               </div>
@@ -411,12 +421,12 @@ export default function SkillGapPage() {
                       </td>
                       <td className="py-3.5">
                         <span className={statusBadgeClass[gap.gap_status] || 'badge-gray'}>
-                          {gap.gap_status.replace('_', ' ')}
+                          {gap.gap_status.replace(/_/g, ' ')}
                         </span>
                       </td>
                       <td className="py-3.5">
                         <span className={importanceBadgeClass[gap.importance] || 'badge-gray'}>
-                          {gap.importance.replace('_', ' ')}
+                          {gap.importance.replace(/_/g, ' ')}
                         </span>
                       </td>
                       <td className="py-3.5">

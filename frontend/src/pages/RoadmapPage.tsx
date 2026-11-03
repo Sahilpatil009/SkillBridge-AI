@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Map, CheckCircle, Clock, RefreshCw, X, ChevronLeft, ChevronRight, Award, AlertTriangle, Play, Video, ExternalLink } from 'lucide-react'
-import api from '../lib/api'
+import api, { getApiErrorMessage } from '../lib/api'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import ErrorAlert from '../components/ui/ErrorAlert'
 import EmptyState from '../components/ui/EmptyState'
@@ -65,7 +65,7 @@ function AssessmentModal({
       setResult(res.data)
       setSubmitted(true)
     } catch (e: any) {
-      setError(e.response?.data?.detail || 'Submission failed. Please try again.')
+      setError(getApiErrorMessage(e, 'Submission failed. Please try again.'))
     } finally {
       setSubmitting(false)
     }
@@ -358,7 +358,7 @@ export default function RoadmapPage() {
   const handleGenerate = async () => {
     setGenerating(true); setError('')
     try { const res = await api.post('/api/v1/roadmap/generate'); setRoadmap(res.data) }
-    catch (e: any) { setError(e.response?.data?.detail || 'Failed to generate roadmap.') }
+    catch (e: unknown) { setError(getApiErrorMessage(e, 'Failed to generate roadmap.')) }
     finally { setGenerating(false) }
   }
 
@@ -398,8 +398,8 @@ export default function RoadmapPage() {
         questions: res.data.questions,
         assessmentId: res.data.assessment_id,
       })
-    } catch (e: any) {
-      setError(e.response?.data?.detail || 'Failed to start assessment.')
+    } catch (e: unknown) {
+      setError(getApiErrorMessage(e, 'Failed to start assessment.'))
     } finally {
       setStartingAssessmentId(null)
     }

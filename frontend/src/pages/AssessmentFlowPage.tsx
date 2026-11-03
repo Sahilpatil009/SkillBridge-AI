@@ -11,7 +11,8 @@ import {
   Award,
   ShieldCheck,
 } from 'lucide-react'
-import api from '../lib/api'
+import api, { getApiErrorMessage } from '../lib/api'
+import { loadAssessmentSession, saveAssessmentSession } from '../lib/assessmentSession'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import ErrorAlert from '../components/ui/ErrorAlert'
 
@@ -59,8 +60,10 @@ interface AssessmentResult {
 
 const difficultyBadge: Record<string, string> = {
   easy: 'badge-green',
+  basic: 'badge-green',
   intermediate: 'badge-yellow',
   hard: 'badge-red',
+  advanced: 'badge-red',
 }
 const proficiencyColor: Record<string, string> = {
   beginner: 'badge-red',
@@ -107,7 +110,7 @@ function QuizView({
       const res = await api.post(`/api/v1/assessments/${assessmentId}/submit`, payload)
       onDone(res.data)
     } catch (e: any) {
-      setError(e.response?.data?.detail || 'Submission failed. Please try again.')
+      setError(getApiErrorMessage(e, 'Submission failed. Please try again.'))
     } finally {
       setSubmitting(false)
     }
@@ -402,22 +405,26 @@ export default function AssessmentFlowPage() {
   const location = useLocation()
   const navigate = useNavigate()
 
+  const isResultRoute = location.pathname.endsWith('/result')
   const locationState = location.state as {
     questions?: Question[]
     skill_id?: number
     skillName?: string
   } | null
+  const storedSession = !isResultRoute && id ? loadAssessmentSession(id) : null
 
-  const [questions, setQuestions] = useState<Question[]>(locationState?.questions || [])
-  const [skillName, setSkillName] = useState(locationState?.skillName || '')
+  const [questions, setQuestions] = useState<Question[]>(
+    (locationState?.questions as Question[] | undefined) ||
+      (storedSession?.questions as Question[] | undefined) ||
+      [],
+  )
+  const [skillName, setSkillName] = useState(locationState?.skillName || storedSession?.skillName || '')
   const [assessmentId, setAssessmentId] = useState<number | null>(
-    id && !/result/.test(location.pathname) ? parseInt(id, 10) : null
+    id && !isResultRoute ? parseInt(id, 10) : null
   )
   const [result, setResult] = useState<AssessmentResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const isResultRoute = location.pathname.endsWith('/result')
 
   const loadResult = useCallback(async (aId: number) => {
     setLoading(true)
@@ -438,6 +445,27 @@ export default function AssessmentFlowPage() {
     }
   }, [id, isResultRoute, loadResult])
 
+  useEffect(() => {
+    if (isResultRoute || !id || questions.length) return
+    const assessmentNumericId = parseInt(id, 10)
+    if (!assessmentNumericId) return
+    setLoading(true)
+    api
+      .get(`/api/v1/assessments/${assessmentNumericId}`)
+      .then((res) => {
+        setQuestions(res.data.questions || [])
+        setSkillName(res.data.skill_name || '')
+        setAssessmentId(res.data.assessment_id)
+        saveAssessmentSession(res.data.assessment_id, {
+          questions: res.data.questions,
+          skill_id: res.data.skill_id,
+          skillName: res.data.skill_name || '',
+        })
+      })
+      .catch((e: unknown) => setError(getApiErrorMessage(e, 'Could not load this assessment. Start it again from the list.')))
+      .finally(() => setLoading(false))
+  }, [id, isResultRoute, questions.length])
+
   const handleRetake = async () => {
     if (!result) return
     setLoading(true)
@@ -448,9 +476,14 @@ export default function AssessmentFlowPage() {
       setAssessmentId(res.data.assessment_id)
       setSkillName(result.skill_name)
       setResult(null)
+      saveAssessmentSession(res.data.assessment_id, {
+        questions: res.data.questions,
+        skill_id: res.data.skill_id,
+        skillName: result.skill_name,
+      })
       navigate(`/app/assessments/${res.data.assessment_id}`, { replace: true })
     } catch (e: any) {
-      setError(e.response?.data?.detail || 'Failed to start new attempt.')
+      setError(getApiErrorMessage(e, 'Failed to start new attempt.'))
     } finally {
       setLoading(false)
     }

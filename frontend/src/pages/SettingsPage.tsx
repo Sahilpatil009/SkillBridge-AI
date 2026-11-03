@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import api from '../lib/api'
+import api, { getApiErrorMessage } from '../lib/api'
 import ErrorAlert from '../components/ui/ErrorAlert'
 import { StudentProfile } from '../types'
 
@@ -52,13 +52,24 @@ export default function SettingsPage() {
     setSavingProfile(true)
     try {
       await api.patch('/api/v1/profile/user', { name })
-      await api.put('/api/v1/profile', profile)
+      await api.put('/api/v1/profile', {
+        college: profile.college || null,
+        degree: profile.degree || null,
+        branch: profile.branch || null,
+        year_of_study: profile.year_of_study || null,
+        career_interests: profile.career_interests || null,
+        learning_format: profile.learning_format || null,
+        study_hours_per_week: profile.study_hours_per_week ?? null,
+        career_goal: profile.career_goal || null,
+        bio: profile.bio || null,
+        github_url: profile.github_url || null,
+        linkedin_url: profile.linkedin_url || null,
+      })
       setProfileFeedback({ type: 'success', message: 'Profile updated successfully.' })
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
       setProfileFeedback({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'Failed to update profile.',
+        message: getApiErrorMessage(err, 'Failed to update profile.'),
       })
     } finally {
       setSavingProfile(false)
@@ -87,10 +98,9 @@ export default function SettingsPage() {
       setNewPassword('')
       setConfirmPassword('')
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
       setPasswordFeedback({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'Failed to change password.',
+        message: getApiErrorMessage(err, 'Failed to change password.'),
       })
     } finally {
       setSavingPassword(false)

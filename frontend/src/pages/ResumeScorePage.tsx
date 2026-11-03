@@ -14,7 +14,7 @@ import {
   Check,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import api from '../lib/api'
+import api, { getApiErrorMessage } from '../lib/api'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import ErrorAlert from '../components/ui/ErrorAlert'
 
@@ -117,8 +117,8 @@ export default function ResumeScorePage() {
         career_id: selectedCareerId ? parseInt(selectedCareerId, 10) : null,
       })
       setResult(res.data)
-    } catch (e: any) {
-      setError(e.response?.data?.detail || 'Failed to analyze resume. Please try again.')
+    } catch (e: unknown) {
+      setError(getApiErrorMessage(e, 'Failed to analyze resume. Please try again.'))
     } finally {
       setAnalyzing(false)
     }

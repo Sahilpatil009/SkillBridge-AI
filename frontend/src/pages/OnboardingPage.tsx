@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BrainCircuit, ChevronRight, ChevronLeft } from 'lucide-react'
-import api from '../lib/api'
+import api, { getApiErrorMessage } from '../lib/api'
 import ErrorAlert from '../components/ui/ErrorAlert'
 
 const YEAR_OPTIONS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Post-Graduate']
@@ -79,8 +79,7 @@ export default function OnboardingPage() {
       await api.put('/api/v1/profile', payload)
       navigate('/app/dashboard', { replace: true })
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
-      setError(e?.response?.data?.detail ?? 'Failed to save profile. Please try again.')
+      setError(getApiErrorMessage(err, 'Failed to save profile. Please try again.'))
     } finally {
       setLoading(false)
     }

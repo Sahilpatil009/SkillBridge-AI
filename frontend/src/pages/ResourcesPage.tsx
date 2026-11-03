@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
   Code2,
@@ -913,13 +914,21 @@ const generalSkills: SkillGapEntry[] = [
 ]
 
 export default function ResourcesPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [report, setReport] = useState<GapReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'resources' | 'projects'>('projects')
+  const [activeTab, setActiveTab] = useState<'resources' | 'projects'>(
+    location.pathname.includes('/resources') ? 'resources' : 'projects',
+  )
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState('all')
   const [expanded, setExpanded] = useState<Record<number, boolean>>({})
+
+  useEffect(() => {
+    setActiveTab(location.pathname.includes('/resources') ? 'resources' : 'projects')
+  }, [location.pathname])
 
   useEffect(() => {
     api.get('/api/v1/skill-gap')
@@ -969,7 +978,7 @@ export default function ResourcesPage() {
           {(['projects', 'resources'] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => navigate(tab === 'projects' ? '/app/projects' : '/app/resources')}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-mono text-xs font-bold uppercase tracking-wider transition-all ${
                 activeTab === tab
                   ? 'bg-black text-white shadow-[2px_2px_0px_#EC4899]'
